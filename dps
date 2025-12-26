@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Docker PS Please - Because remembering '--format' is harder than explaining Docker to your grandma
+
+# Default columns: ID, Image, Status, Names, Ports
+# Because who needs 15 columns to know if your container is dead?
+
+# Color codes for our emotional support output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color (like your containers after they crash)
+
+# The magic format string we always forget
+FORMAT="table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}\t{{.Ports}}"
+
+# Check if Docker is even installed (optimism is key)
+if ! command -v docker &> /dev/null; then
+    echo -e "${RED}Docker not found. Did you try turning it off and on again?${NC}" >&2
+    exit 1
+fi
+
+# Check if Docker daemon is running (it never is when you need it)
+if ! docker info &> /dev/null; then
+    echo -e "${RED}Docker daemon not responding. Have you tried sacrificing a goat?${NC}" >&2
+    exit 1
+fi
+
+# The actual command - simple, clean, memorable
+# Using printf for consistent column widths because alignment is free therapy
+docker ps --format "$FORMAT" | \
+while IFS=$'\t' read -r id image status names ports; do
+    # Colorize status because red = bad, green = good is the extent of our emotional intelligence
+    colored_status="$status"
+    if [[ "$status" == Up* ]]; then
+        colored_status="${GREEN}${status}${NC}"
+    elif [[ "$status" == Exited* ]]; then
+        colored_status="${RED}${status}${NC}"
+    else
+        colored_status="${YELLOW}${status}${NC}"
+    fi
+    
+    # Truncate long image names (looking at you, AWS ECR)
+    short_image="${image:0:30}"
+    if [ "${#image}" -gt 30 ]; then
+        short_image="${short_image}..."
+    fi
+    
+    # Print with consistent spacing (because chaos is for the container logs)
+    printf "%-13s %-33s %-25s %-20s %s\n" "$id" "$short_image" "$colored_status" "$names" "$ports"
+done
+
+# Exit with Docker's exit code because we're responsible adults (mostly)
+exit $?
